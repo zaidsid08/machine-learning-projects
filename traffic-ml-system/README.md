@@ -22,39 +22,43 @@ This project aims to:
 
 ---
 
-## Dataset
+## Data Source
 
-The initial phase of the project uses a public traffic dataset containing:
+The initial dataset used in this project is sourced from Kaggle:
+
+- **Dataset:** Traffic Prediction Dataset
+- **Platform:** Kaggle
+- **URL:** https://www.kaggle.com/datasets/fedesoriano/traffic-prediction-dataset
+
+The dataset contains:
 - Timestamped traffic observations
 - Junction identifiers representing traffic locations
-- Vehicle counts as a proxy for congestion level
+- Vehicle counts, which are used as a **proxy for traffic congestion**
 
-Traffic volume is treated as a **congestion signal** in early stages.  
-The system is designed to later support:
-- Speed-based targets
-- Road-segment–level data
-- Integration with map and routing data
+Raw data is stored immutably in `data/raw/` and is treated as read-only.  
+All transformations and cleaning steps are performed via code and saved separately in `data/processed/`.
 
 ---
 
 ## System Design
 
-The project follows an industry-style ML system pipeline:
+The project follows an industry-style machine learning pipeline:
 
 ### 1. Data Ingestion
-- Raw datasets are stored immutably in `data/raw/`
-- No manual modification of raw files
+- Raw datasets are stored in `data/raw/`
+- Original files are never modified manually
 
 ### 2. Data Cleaning & Processing
 - Timestamp parsing and validation
-- Sorting by location and time
 - Removal of invalid or missing observations
-- Cleaned datasets saved to `data/processed/`
+- Selection of relevant columns
+- Sorting by location and time
+- Cleaned outputs saved to `data/processed/`
 
 ### 3. Feature Engineering
 - Rolling window features capturing recent traffic behavior
-- Temporal features (hour of day, day of week, weekend indicators)
-- Structured to support future contextual features (e.g., weather)
+- Temporal features (hour of day, day of week)
+- Designed to support future contextual features (e.g., weather)
 
 ### 4. Machine Learning
 - Baseline and ML models for short-term congestion forecasting
@@ -72,7 +76,7 @@ The project follows an industry-style ML system pipeline:
 ```text
 traffic-ml-system/
 ├── data/
-│   ├── raw/            # original datasets
+│   ├── raw/            # original datasets (read-only)
 │   └── processed/      # cleaned and feature-ready data
 ├── models/             # trained models
 ├── notebooks/          # exploratory analysis
