@@ -94,6 +94,7 @@ def select_relevant_columns(
         if not (col == segment_column or col == time_column or col == target_column):
             df = df.drop(columns=[col])
     return df
+    # commiting again on same email
 
 
 def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
