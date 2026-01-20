@@ -1,0 +1,5 @@
+DateTime,Junction,Vehicles,ID,Weather,HolidayFlag,SpeedLimit
+2015-11-01 00:00:00,1,10,a1,Clear,0,50
+2015-11-01 01:00:00,1,12,a2,Clear,0,50
+2015-11-01 02:00:00,1,11,a3,Rain,0,50
+2015-11-01 03:00:00,2,35,a4,Snow,0,80

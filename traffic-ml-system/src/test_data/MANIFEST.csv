@@ -1,0 +1,9 @@
+file,purpose
+test_convertible_numeric_with_whitespace.csv,Valid datetimes; missing hours for junction 2 (still valid).
+test_duplicate_timestamps_same_junction.csv,Valid datetimes; duplicate timestamps within same junction.
+test_extra_irrelevant_columns.csv,Whitespace numeric strings; tests stripping/coercion.
+test_id_missing_and_duplicate.csv,Different schema: timestamp/segment_id/volume/row_id.
+test_missing_hours.csv,Valid core columns plus extra irrelevant columns.
+test_schema_different_column_names.csv,"One-week hourly realistic pattern, all valid rows."
+test_weekly_realistic_valid.csv,Valid core but ID missing/duplicate values.
+test_year_boundary_valid.csv,Valid datetimes across year boundary (edge case but valid).

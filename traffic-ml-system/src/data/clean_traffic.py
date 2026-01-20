@@ -91,12 +91,33 @@ def select_relevant_columns(
         pd.DataFrame: Reduced dataframe with selected columns.
     """
     for col in df:
+        # remove column if name does not match with one of the names from the
+        # parameter column names
         if not (col == segment_column or col == time_column or col == target_column):
             df = df.drop(columns=[col])
     return df
-    # commiting again on same email
 
+def is_positive_integer(s: str) -> bool:
+    """
+    Determine whether a string can be safely converted to a positive integer.
 
+    This function strips leading and trailing whitespace and attempts to
+    convert the string to an integer. The value is considered valid only
+    if the conversion succeeds and the integer is greater than zero.
+
+    Args:
+        s (str): Input string to check.
+
+    Returns:
+        bool: True if the string is a valid positive integer, False otherwise.
+    """
+    try:
+        num = int(s)
+    except ValueError:
+        return False
+    if num > 0:
+        return True
+    return False
 def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove rows containing missing or invalid values.
@@ -107,7 +128,23 @@ def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Cleaned dataframe with invalid rows removed.
     """
-    pass
+    i = 0
+    IDs = []
+    for col in df:
+        for row in df[col]:
+            if col == "DateTime":
+                if pd.isna(pd.to_datetime(row, errors="coerce")):
+                    print("removed row number " + str(row + 2) + " of csv: " + str(df[col][row]))
+                    df = df.drop(index=i)
+                elif col == "Junction" or col == "Vehicles":
+                    if not is_positive_integer(str(row)):
+                        df = df.drop(index=i)
+                elif col == "ID" and is_positive_integer(str(row)):
+                    if row not in IDs:
+                        IDs.append(row)
+                    else:
+                        df = df.drop(index=i)
+                i += 1
 
 
 def sort_time_series(
@@ -171,24 +208,8 @@ if __name__ == "__main__":
     """
     Entry point for running the cleaning pipeline as a script.
     """
-    DATA_ROOT = Path(__file__).resolve().parents[0]
-    # RAW_DATA_PATH = DATA_ROOT / "raw" / "traffic.csv"
-    # df = load_raw_traffic_data(RAW_DATA_PATH)
-    # df = parse_timestamps(df, "DateTime")
-    # # testing if all invalid time stamps have been removed form datetime column
-    # for time in df["DateTime"]:
-    #     if not isinstance(time, pd.Timestamp):
-    #         print(False)
-    #         break
-    # testing select_relevant_columns:
-    RAW_DATA_PATH_WITH_EXTRA_COLS = DATA_ROOT / "raw" / ("traffic_extra_cols.csv")
-    extra_cols_df = load_raw_traffic_data(RAW_DATA_PATH_WITH_EXTRA_COLS)
-    select_relevant_columns(extra_cols_df, "Junction", "Datetime", "Vehicles")
-    for col in extra_cols_df:
-        print(col)
 
-
-    # RAW_DATA_PATH = Path("data/raw/traffic.csv")
+# RAW_DATA_PATH = Path("data/raw/traffic.csv")
     # OUTPUT_PATH = Path("data/processed/segment_timeseries.csv")
     #
     # run_cleaning_pipeline(RAW_DATA_PATH, OUTPUT_PATH)
