@@ -118,33 +118,7 @@ def is_positive_integer(s: str) -> bool:
     if num > 0:
         return True
     return False
-def remove_invalid_rows(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Remove rows containing missing or invalid values.
 
-    Args:
-        df (pd.DataFrame): Input dataframe.
-
-    Returns:
-        pd.DataFrame: Cleaned dataframe with invalid rows removed.
-    """
-    i = 0
-    IDs = []
-    for col in df:
-        for row in df[col]:
-            if col == "DateTime":
-                if pd.isna(pd.to_datetime(row, errors="coerce")):
-                    print("removed row number " + str(row + 2) + " of csv: " + str(df[col][row]))
-                    df = df.drop(index=i)
-                elif col == "Junction" or col == "Vehicles":
-                    if not is_positive_integer(str(row)):
-                        df = df.drop(index=i)
-                elif col == "ID" and is_positive_integer(str(row)):
-                    if row not in IDs:
-                        IDs.append(row)
-                    else:
-                        df = df.drop(index=i)
-                i += 1
 
 
 def sort_time_series(
@@ -164,6 +138,64 @@ def sort_time_series(
         pd.DataFrame: Time-ordered dataframe.
     """
     pass
+def remove_invalid_rows(
+        df: pd.DataFrame,
+        segment_column: str = "Junction",
+        time_column: str = "DateTime",
+        target_column: str = "Vehicles",
+        id_column: str = "ID",
+) -> pd.DataFrame:
+    """
+    Remove rows containing missing or invalid values.
+
+    Rules (row is kept only if ALL are true):
+      - time_column parses to a valid datetime
+      - segment_column is a positive integer
+      - target_column is a positive integer
+      - id_column is a positive integer AND unique within the dataframe
+
+    Args:
+        df (pd.DataFrame): Input dataframe.
+        segment_column (str): Column identifying traffic location.
+        time_column (str): Timestamp column.
+        target_column (str): Traffic signal column (e.g., volume).
+        id_column (str): Unique row identifier column.
+
+    Returns:
+        pd.DataFrame: Cleaned dataframe with invalid rows removed.
+    """
+    bad_idxs: list[int] = []
+    seen_ids: set[int] = set()
+
+    # iterate row-by-row (safe), collect bad indices, drop once at end
+    for idx, r in df.iterrows():
+        # --- timestamp valid ---
+        dt = pd.to_datetime(r.get(time_column), errors="coerce")
+        if pd.isna(dt):
+            bad_idxs.append(idx)
+            continue
+
+        # --- junction + vehicles valid positive ints ---
+        junction_val = r.get(segment_column)
+        vehicles_val = r.get(target_column)
+
+        if not is_positive_integer(str(junction_val)) or not is_positive_integer(str(vehicles_val)):
+            bad_idxs.append(idx)
+            continue
+
+        # --- id valid + unique ---
+        id_val = r.get(id_column)
+        if not is_positive_integer(str(id_val)):
+            bad_idxs.append(idx)
+            continue
+
+        id_int = int(str(id_val).strip())
+        if id_int in seen_ids:
+            bad_idxs.append(idx)
+            continue
+        seen_ids.add(id_int)
+
+    return df.drop(index=bad_idxs)
 
 
 def save_processed_data(
@@ -208,8 +240,93 @@ if __name__ == "__main__":
     """
     Entry point for running the cleaning pipeline as a script.
     """
+    TRAFFIC_ROOT = Path(__file__).resolve().parents[2]   # traffic-ml-system/
+    TEST_DATA_DIR = TRAFFIC_ROOT / "src" / "test_data"
 
-# RAW_DATA_PATH = Path("data/raw/traffic.csv")
+    df_convertible_numeric = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_convertible_numeric_with_whitespace.csv"
+    )
+
+    df_duplicate_timestamps = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_duplicate_timestamps_same_junction.csv"
+    )
+
+    df_extra_columns = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_extra_irrelevant_columns.csv"
+    )
+
+    df_id_missing_and_duplicate = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_id_missing_and_duplicate.csv"
+    )
+
+    df_missing_hours = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_missing_hours.csv"
+    )
+
+    df_schema_diff_names = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_schema_different_column_names.csv"
+    )
+
+    df_weekly_realistic = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_weekly_realistic_valid.csv"
+    )
+
+    df_year_boundary = load_raw_traffic_data(
+        TEST_DATA_DIR / "test_year_boundary_valid.csv"
+    )
+
+    all_dfs = [df_convertible_numeric, df_duplicate_timestamps,
+               df_extra_columns, df_id_missing_and_duplicate, df_missing_hours,
+               df_schema_diff_names, df_weekly_realistic, df_year_boundary]
+    # testing all methods on all dataframes of all test csvs
+    # 1. testing parse_timestamps on all dfs
+    for df in all_dfs:
+        if df is df_schema_diff_names:
+            parse_timestamps(df, "timestamp")
+            for row in df["timestamp"]:
+                if not isinstance(row, pd.Timestamp):
+                    print(False)
+        else:
+            parse_timestamps(df, "DateTime")
+            for row in df["DateTime"]:
+                    if not isinstance(row, pd.Timestamp):
+                        print(False)
+
+    # 2. testing select_relevant_timestamps
+    i = 0
+    for df in all_dfs:
+
+        if df is df_schema_diff_names:
+            all_dfs[i] = select_relevant_columns(df, "segment_id", "timestamp", "volume")
+        else:
+            all_dfs[i] = select_relevant_columns(df, "Junction", "DateTime", "Vehicles")
+        i += 1
+
+
+    for df in all_dfs:
+        for col in df:
+                if col not in ["segment_id", "timestamp", "volume", "Junction", "DateTime", "Vehicles"]:
+                    print(str(col) + " is not supposed to be in df but is still here")
+
+    # 3. testing remove_invalid_rows
+    all_dfs = [df_convertible_numeric, df_duplicate_timestamps,
+               df_extra_columns, df_id_missing_and_duplicate, df_missing_hours,
+               df_schema_diff_names, df_weekly_realistic, df_year_boundary]
+    i = 0
+    for df in all_dfs:
+        if df is df_schema_diff_names:
+            segment_column, time_column, target_column, id_column = "segment_id", "timestamp", "volume", "row_id"
+            all_dfs[i] = remove_invalid_rows(df, "segment_id", "timestamp", "volume", "row_id")
+        else:
+            segment_column, time_column, target_column, id_column = "Junction", "DateTime", "Vehicles", "ID"
+            all_dfs[i] = remove_invalid_rows(df, "Junction", "DateTime", "Vehicles", "ID")
+        for row in df[time_column]:
+
+
+        i += 1
+
+
+    # RAW_DATA_PATH = Path("data/raw/traffic.csv")
     # OUTPUT_PATH = Path("data/processed/segment_timeseries.csv")
     #
     # run_cleaning_pipeline(RAW_DATA_PATH, OUTPUT_PATH)
