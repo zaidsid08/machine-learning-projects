@@ -9,6 +9,7 @@ feature engineering and machine learning.
 
 from pathlib import Path
 import pandas as pd
+import bisect
 
 
 
@@ -97,7 +98,7 @@ def select_relevant_columns(
             df = df.drop(columns=[col])
     return df
 
-def is_positive_integer(s: str) -> bool:
+def is_positive_integer(n: int) -> bool:
     """
     Determine whether a string can be safely converted to a positive integer.
 
@@ -106,13 +107,13 @@ def is_positive_integer(s: str) -> bool:
     if the conversion succeeds and the integer is greater than zero.
 
     Args:
-        s (str): Input string to check.
+        n (int): Input string to check.
 
     Returns:
         bool: True if the string is a valid positive integer, False otherwise.
     """
     try:
-        num = int(s)
+        num = int(n)
     except ValueError:
         return False
     if num > 0:
@@ -137,7 +138,41 @@ def sort_time_series(
     Returns:
         pd.DataFrame: Time-ordered dataframe.
     """
-    pass
+    #creating array where all rows of df stored as one row df in order of ascending segement_column
+    df = df.sort_values(by=segment_column).reset_index(drop=True)
+    rows = [df.iloc[[i]] for i in range(len(df))]
+    timestamp_rows = []
+    current = rows[0][segment_column].iloc[0]
+    previous_index = 0
+    first = True
+    for index, row in enumerate(rows):
+        if row[segment_column].iloc[0] != current:
+            if first:
+                subset = rows[:index]
+                sorted_rows = sorted(subset,key=lambda r: pd.to_datetime(r[time_column].iloc[0]))
+                timestamp_rows.extend(sorted_rows)
+                previous_index = index
+
+            else:
+                subset = rows[previous_index:index]
+                sorted_rows = sorted(subset,key=lambda r: pd.to_datetime(r[time_column].iloc[0]))
+                timestamp_rows.extend(sorted_rows)
+                previous_index = index
+
+
+            current = rows[index][segment_column].iloc[0]
+        first = False
+
+    subset = rows[previous_index:]
+    sorted_rows = sorted(subset,key=lambda r: pd.to_datetime(r[time_column].iloc[0]))
+    timestamp_rows.extend(sorted_rows)
+
+    return pd.concat(timestamp_rows, ignore_index=True)
+
+
+
+
+
 def remove_invalid_rows(
         df: pd.DataFrame,
         segment_column: str = "Junction",
@@ -168,30 +203,30 @@ def remove_invalid_rows(
     seen_ids: set[int] = set()
 
     # iterate row-by-row (safe), collect bad indices, drop once at end
-    for idx, r in df.iterrows():
+    for index, row in df.iterrows():
         # --- timestamp valid ---
-        dt = pd.to_datetime(r.get(time_column), errors="coerce")
+        dt = pd.to_datetime(row.get(time_column), errors="coerce")
         if pd.isna(dt):
-            bad_idxs.append(idx)
+            bad_idxs.append(i)
             continue
 
         # --- junction + vehicles valid positive ints ---
-        junction_val = r.get(segment_column)
-        vehicles_val = r.get(target_column)
+        junction_val = row.get(segment_column)
+        vehicles_val = row.get(target_column)
 
-        if not is_positive_integer(str(junction_val)) or not is_positive_integer(str(vehicles_val)):
-            bad_idxs.append(idx)
+        if not is_positive_integer(junction_val) or not is_positive_integer(vehicles_val):
+            bad_idxs.append(i)
             continue
 
         # --- id valid + unique ---
-        id_val = r.get(id_column)
-        if not is_positive_integer(str(id_val)):
-            bad_idxs.append(idx)
+        id_val = row.get(id_column)
+        if not is_positive_integer(id_val):
+            bad_idxs.append(i)
             continue
 
         id_int = int(str(id_val).strip())
         if id_int in seen_ids:
-            bad_idxs.append(idx)
+            bad_idxs.append(i)
             continue
         seen_ids.add(id_int)
 
@@ -323,7 +358,7 @@ if __name__ == "__main__":
         for row in df[time_column]:
 
 
-        i += 1
+            i += 1
 
 
     # RAW_DATA_PATH = Path("data/raw/traffic.csv")
