@@ -11,7 +11,12 @@ from pathlib import Path
 import pandas as pd
 import bisect
 
-
+DEFAULT_SCHEMA = {
+    "time_column": "DateTime",
+    "segment_column": "Junction",
+    "target_column": "Vehicles",
+    "id_column": "ID",
+}
 
 def load_raw_traffic_data(file_path: Path) -> pd.DataFrame:
     """
@@ -247,12 +252,15 @@ def save_processed_data(
     Returns:
         None
     """
-    pass
+    df.to_csv(output_path, index=False)
+
+
 
 
 def run_cleaning_pipeline(
         raw_data_path: Path,
-        output_path: Path
+        output_path: Path,
+        schema: dict = DEFAULT_SCHEMA,
 ) -> None:
     """
     Run the full traffic data cleaning pipeline.
@@ -268,7 +276,34 @@ def run_cleaning_pipeline(
     Returns:
         None
     """
-    pass
+    df = load_raw_traffic_data(raw_data_path)
+
+    df = select_relevant_columns(
+        df,
+        segment_column=schema["segment_column"],
+        time_column=schema["time_column"],
+        target_column=schema["target_column"],
+        id_column=schema["id_column"],
+    )
+
+    df = parse_timestamps(df, time_column=schema["time_column"])
+
+    df = remove_invalid_rows(
+        df,
+        segment_column=schema["segment_column"],
+        time_column=schema["time_column"],
+        target_column=schema["target_column"],
+        id_column=schema["id_column"],
+    )
+
+    df = sort_time_series(
+        df,
+        segment_column=schema["segment_column"],
+        time_column=schema["time_column"],
+    )
+
+    save_processed_data(df, output_path)
+
 
 
 if __name__ == "__main__":
