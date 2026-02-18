@@ -15,11 +15,14 @@ Outputs:
 
 from __future__ import annotations
 
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -86,10 +89,9 @@ def ensure_datetime(df: pd.DataFrame, time_column: str) -> pd.DataFrame:
     Raises:
         ValueError: If any timestamps cannot be parsed.
     """
-    i = 0
-    for dt in df[time_column]:
-        df[time_column][i] = pd.to_datetime(dt)
-        i += 1
+    new_df = df.copy()
+    new_df[time_column] = pd.to_datetime(new_df[time_column], errors="raise")
+    return new_df
 
 def sort_by_segment_and_time(df: pd.DataFrame, segment_column: str, time_column: str) -> pd.DataFrame:
     """
@@ -150,8 +152,30 @@ def add_time_features(df: pd.DataFrame, time_column: str) -> pd.DataFrame:
     Returns:
         DataFrame with new time feature columns added.
     """
-    #for dt in df[time_column]:
+    # new_df = df.copy()
+    # new_df["hour"] = []
+    # new_df["day_of_week"] = []
+    # new_df["is_weekend"] = []
+    # i = 0
+    # for dt in new_df[time_column]:
+    #     new_df.loc[i, "hour"] = dt.hour
+    #     new_df.loc[i, "day_of_week"] = dt.weekday()
+    #     if dt.weekday() > 5:
+    #         new_df.loc[i, "is_weekend"] = 1
+    #     else:
+    #         new_df.loc[i, "is_weekend"] = 0
+    #
+    #     i += 1
+    #
+    # return new_df
 
+    new_df = df.copy()
+
+    new_df["hour"] = new_df["DateTime"].dt.hour
+    new_df["day_of_week"] = new_df["DateTime"].dt.dayofweek
+    new_df["is_weekend"] = (new_df["day_of_week"] >= 5).astype(int)
+
+    return new_df
 
 
 def add_lag_features(
@@ -175,7 +199,10 @@ def add_lag_features(
     Returns:
         DataFrame with new lag feature columns added.
     """
-    raise NotImplementedError
+    new_df = df.copy()
+    for lag_num in lags:
+        new_df["Vehicles_lag_" + str(lag_num)] = new_df.groupby(segment_column)[target_column].shift(lag_num)
+    return new_df
 
 
 def add_rolling_features(
@@ -200,7 +227,15 @@ def add_rolling_features(
     Returns:
         DataFrame with new rolling feature columns added.
     """
-    raise NotImplementedError
+    new_df = df.copy()
+    for window in windows:
+        values = []
+        for i in range(window):
+             values.append(new_df.groupby(segment_column)[target_column].shift(i))
+             values.append(new_df.groupby(segment_column)[target_column].shift(i))
+        # new_df["Rolling_mean_" + str(window)] =
+        # new_df["Rolling_std_" + str(window)] =
+    return new_df
 
 
 def make_supervised_targets(
@@ -288,4 +323,50 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+
+    TRAFFIC_ROOT = Path(__file__).resolve().parents[2] #traffic-ml-system
+    TEST_DATA_DIR = TRAFFIC_ROOT / "src" / "test_data"
+
+    df_features_horizon = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_horizon.csv"
+    )
+
+    df_features_multi_segment = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_multi_segment.csv"
+    )
+
+    df_features_short_series = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_short_series.csv"
+    )
+
+    df_features_unsorted = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_unsorted.csv"
+    )
+
+    df_features_valid_small = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_valid_small.csv"
+    )
+
+    df_features_weekend_span = load_processed_timeseries(
+        TEST_DATA_DIR / "test_features_weekend_span.csv"
+    )
+
+    df_lag_multi_segment = load_processed_timeseries(
+        TEST_DATA_DIR / "test_lag_multi_segment.csv"
+    )
+
+    #testing add_time_features
+    df = ensure_datetime(df_features_horizon, "DateTime")
+    df = add_time_features(df, "DateTime")
+    i = 0
+    for hour in df["hour"]:
+        print(str(hour) + ", " +str(df["day_of_week"][i]) + ", " + str(df["is_weekend"][i]))
+        i+=1
+
+    # testing add_lag_features
+    print(df)
+    df = add_lag_features(df_lag_multi_segment, "Junction", "Vehicles", (1,))
+    print(df)
+
+
+    #main()
