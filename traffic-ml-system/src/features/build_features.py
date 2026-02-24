@@ -24,6 +24,8 @@ import pandas as pd
 
 from pathlib import Path
 
+import statistics
+
 
 @dataclass(frozen=True)
 class FeatureConfig:
@@ -233,12 +235,17 @@ def add_rolling_features(
         df[f"{target_column}_roll_std_{window}"] = None
         for junction_value, junction_df in df.groupby(segment_column):
 
-
+            values = []
             for index, row in junction_df.iterrows():
+                values.append(row[target_column])
+            for i, row in junction_df.iterrows():
+                values = values[max(0, i-window):i]
+                mean = statistics.mean(values)
+                df[f"{target_column}_roll_mean_{window}"][i] = mean
+                std_dev  = statistics.stdev(values)
+                df[f"{target_column}_roll_std_{window}"][i] = std_dev
 
-
-
-    return new_df
+    return df
 
 
 def make_supervised_targets(
