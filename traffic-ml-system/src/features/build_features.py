@@ -227,14 +227,17 @@ def add_rolling_features(
     Returns:
         DataFrame with new rolling feature columns added.
     """
-    new_df = df.copy()
+    df = df.copy()
     for window in windows:
-        values = []
-        for i in range(window):
-             values.append(new_df.groupby(segment_column)[target_column].shift(i))
-             values.append(new_df.groupby(segment_column)[target_column].shift(i))
-        # new_df["Rolling_mean_" + str(window)] =
-        # new_df["Rolling_std_" + str(window)] =
+        df[f"{target_column}_roll_mean_{window}"] = None
+        df[f"{target_column}_roll_std_{window}"] = None
+        for junction_value, junction_df in df.groupby(segment_column):
+
+
+            for index, row in junction_df.iterrows():
+
+
+
     return new_df
 
 
